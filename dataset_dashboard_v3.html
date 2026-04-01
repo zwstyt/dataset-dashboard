@@ -1,0 +1,644 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>数据集分析看板 v3 · LiChat & ClaudeCode</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=Noto+Sans+SC:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<style>
+:root {
+  --lc:#1D4ED8; --lc-dim:#3B82F6; --lc-pale:#DBEAFE;
+  --cc:#B45309; --cc-dim:#D97706; --cc-pale:#FEF3C7;
+  --bg:#F1F5F9; --card:#FFFFFF;
+  --ink:#0F172A; --ink2:#334155; --ink3:#64748B; --ink4:#94A3B8;
+  --rule:#E2E8F0;
+  --mono:'IBM Plex Mono',monospace;
+  --sans:'Noto Sans SC','PingFang SC',sans-serif;
+  --ok:#15803D; --warn:#B45309; --err:#B91C1C;
+}
+*{margin:0;padding:0;box-sizing:border-box;}
+body{font-family:var(--sans);background:var(--bg);color:var(--ink);font-size:13px;line-height:1.6;}
+
+.top-header{background:#080F1A;padding:28px 40px 22px;border-bottom:1px solid #1E293B;}
+.th-eyebrow{font-family:var(--mono);font-size:10px;letter-spacing:.18em;color:#475569;text-transform:uppercase;margin-bottom:8px;}
+.th-title{font-size:22px;font-weight:700;color:#F1F5F9;letter-spacing:-.01em;margin-bottom:6px;}
+.th-meta{display:flex;gap:16px;flex-wrap:wrap;margin-top:10px;}
+.th-chip{display:inline-flex;align-items:center;gap:7px;padding:4px 12px;border-radius:20px;font-size:11px;font-weight:600;letter-spacing:.04em;}
+.th-chip-lc{background:rgba(29,78,216,.22);color:#93C5FD;border:1px solid rgba(29,78,216,.4);}
+.th-chip-cc{background:rgba(180,83,9,.22);color:#FCD34D;border:1px solid rgba(180,83,9,.4);}
+.th-chip-gray{background:rgba(255,255,255,.07);color:#64748B;border:1px solid rgba(255,255,255,.12);}
+.dot{width:6px;height:6px;border-radius:50%;display:inline-block;}
+.dot-lc{background:#93C5FD;} .dot-cc{background:#FCD34D;}
+
+.body{max-width:1400px;margin:0 auto;padding:28px 36px 40px;}
+
+.sec-head{display:flex;align-items:center;gap:12px;margin:32px 0 16px;}
+.sec-head:first-child{margin-top:0;}
+.sec-label{font-family:var(--mono);font-size:10px;font-weight:600;letter-spacing:.16em;text-transform:uppercase;color:var(--ink3);white-space:nowrap;}
+.sec-rule{flex:1;height:1px;background:var(--rule);}
+
+.dataset-rule{display:flex;align-items:center;gap:10px;margin:30px 0 18px;}
+.dataset-rule .pill{padding:4px 14px;border-radius:20px;font-size:11px;font-weight:700;}
+.pill-lc{background:var(--lc);color:#fff;} .pill-cc{background:var(--cc-dim);color:#fff;}
+.dataset-rule .lr{flex:1;height:2px;border-radius:1px;}
+.lr-lc{background:linear-gradient(90deg,var(--lc),transparent);}
+.lr-cc{background:linear-gradient(90deg,var(--cc-dim),transparent);}
+
+.sampling-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;}
+.samp-card{background:#F8FAFC;border:1px solid var(--rule);border-radius:8px;padding:16px 18px;}
+.samp-title{font-family:var(--mono);font-size:10px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;margin-bottom:10px;}
+.samp-title.lc{color:var(--lc);} .samp-title.cc{color:var(--cc-dim);}
+.samp-row{display:flex;gap:8px;margin-bottom:5px;font-size:12px;color:var(--ink2);}
+.samp-key{font-family:var(--mono);color:var(--ink3);width:80px;flex-shrink:0;font-size:11px;}
+.samp-note{font-size:11px;color:var(--ink4);margin-top:8px;padding-top:8px;border-top:1px dashed var(--rule);}
+
+.case-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;}
+.case-card{border-radius:10px;overflow:hidden;border:1px solid #1E293B;font-family:var(--mono);font-size:11.5px;}
+.case-header{padding:10px 16px;font-size:10px;font-weight:600;letter-spacing:.12em;text-transform:uppercase;display:flex;align-items:center;gap:8px;}
+.case-header.lc{background:#0F1E40;color:#93C5FD;border-bottom:1px solid #1E3A6E;}
+.case-header.cc{background:#1C1008;color:#FCD34D;border-bottom:1px solid #3D2200;}
+.case-body{background:#0D1117;color:#C9D1D9;padding:14px 16px;overflow-x:auto;}
+.case-body pre{line-height:1.75;white-space:pre-wrap;word-break:break-all;}
+.cf{color:#79C0FF;} .cv{color:#A5D6FF;} .cs{color:#FF7B72;} .cn{color:#F8C555;}
+.cb{color:#56D364;} .cbf{color:#FF7B72;} .cm{color:#8B949E;} .cx{color:#D2A8FF;}
+.cw{color:#FF7B72;font-weight:600;}
+
+.g2{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px;}
+.g3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px;margin-bottom:14px;}
+.g4{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:14px;}
+.full{margin-bottom:14px;}
+
+.card{background:var(--card);border:1px solid var(--rule);border-radius:10px;}
+.cb-{padding:18px 20px;}
+.ctitle{font-size:11px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;color:var(--ink3);margin-bottom:14px;display:flex;align-items:center;gap:7px;}
+.ctag{display:inline-block;padding:1px 7px;border-radius:4px;font-size:10px;font-weight:700;letter-spacing:.04em;}
+.ctag-lc{background:var(--lc-pale);color:var(--lc);}
+.ctag-cc{background:var(--cc-pale);color:var(--cc);}
+.ctag-warn{background:#FEF3C7;color:#92400E;}
+.ctag-err{background:#FEE2E2;color:#991B1B;}
+.ctag-ok{background:#DCFCE7;color:#166534;}
+.ctag-gray{background:#F1F5F9;color:#475569;}
+
+.kpi-val{font-family:var(--mono);font-size:28px;font-weight:600;letter-spacing:-.02em;line-height:1.1;}
+.kpi-label{font-size:11px;color:var(--ink3);margin-bottom:5px;}
+.kpi-sub{font-size:11px;color:var(--ink4);margin-top:5px;}
+.kpi-lc{border-top:3px solid var(--lc);}
+.kpi-cc{border-top:3px solid var(--cc-dim);}
+.kpi-sl{border-top:3px solid #475569;}
+.kpi-te{border-top:3px solid #0891B2;}
+
+.pb-row{display:flex;align-items:center;gap:8px;margin-bottom:6px;}
+.pb-label{font-size:11.5px;color:var(--ink2);width:90px;flex-shrink:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.pb-label-wide{width:145px;}
+.pb-bg{flex:1;background:#F1F5F9;border-radius:3px;height:17px;overflow:hidden;}
+.pb-fill{height:100%;border-radius:3px;display:flex;align-items:center;justify-content:flex-end;padding-right:6px;font-size:10px;font-weight:700;font-family:var(--mono);color:#fff;}
+.pb-pct{width:44px;text-align:right;font-family:var(--mono);font-size:11px;color:var(--ink3);flex-shrink:0;}
+.pb-count{width:58px;text-align:right;font-family:var(--mono);font-size:10.5px;color:var(--ink4);flex-shrink:0;}
+.pb-sub{font-size:10px;color:var(--ink4);margin-top:2px;padding-left:98px;}
+
+.ch{position:relative;} .ch200{height:200px;} .ch220{height:220px;} .ch240{height:240px;} .ch260{height:260px;} .ch280{height:280px;} .ch300{height:300px;}
+
+.stat-row{display:flex;flex-wrap:wrap;gap:10px;margin-top:10px;}
+.stat-pill{display:inline-flex;align-items:center;gap:5px;background:#F8FAFC;border:1px solid var(--rule);border-radius:6px;padding:3px 9px;font-family:var(--mono);font-size:11px;color:var(--ink2);}
+.stat-pill b{color:var(--ink);}
+
+.q-list{list-style:none;}
+.q-item{display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid #F1F5F9;}
+.q-item:last-child{border-bottom:none;}
+.q-left{font-size:12px;color:var(--ink2);}
+.q-left code{font-family:var(--mono);font-size:11px;color:var(--ink);background:#F8FAFC;padding:1px 5px;border-radius:3px;}
+.q-right{display:flex;align-items:center;gap:7px;}
+.q-num{font-family:var(--mono);font-size:12px;font-weight:600;}
+
+.alert{border-radius:7px;padding:10px 14px;font-size:12px;display:flex;gap:8px;margin-bottom:12px;}
+.alert-err{background:#FEF2F2;border:1px solid #FECACA;color:#991B1B;}
+.alert-warn{background:#FFFBEB;border:1px solid #FDE68A;color:#92400E;}
+.alert-info{background:#EFF6FF;border:1px solid #BFDBFE;color:#1E40AF;}
+.alert-icon{flex-shrink:0;}
+
+.fn{font-size:10.5px;color:var(--ink4);font-style:italic;margin-top:8px;padding-top:7px;border-top:1px solid var(--rule);}
+
+/* ── CROSS TABLE ── */
+.cross-table{width:100%;border-collapse:collapse;font-size:11.5px;font-family:var(--mono);}
+.cross-table th{background:#F8FAFC;padding:7px 10px;text-align:center;color:var(--ink3);font-size:10px;font-weight:700;letter-spacing:.06em;border-bottom:2px solid var(--rule);white-space:nowrap;}
+.cross-table th.task-col{text-align:left;width:130px;}
+.cross-table td{padding:7px 10px;border-bottom:1px solid #F8FAFC;text-align:center;color:var(--ink2);}
+.cross-table td.task-name{text-align:left;font-weight:600;color:var(--ink);font-size:11px;}
+.cross-table tr:hover td{background:#FAFBFC;}
+.cross-table td.stat{color:var(--ink);font-weight:600;}
+.cross-table td.n{color:var(--ink4);font-size:10.5px;}
+
+/* Heat: map pct → color intensity */
+.h0{background:#F8FAFC;}
+.h1{background:#EFF6FF;color:#1E40AF;}
+.h2{background:#DBEAFE;color:#1D4ED8;}
+.h3{background:#BFDBFE;color:#1D4ED8;font-weight:600;}
+.h4{background:#93C5FD;color:#1e3a8a;font-weight:700;}
+.h5{background:#3B82F6;color:#fff;font-weight:700;}
+
+/* cc heat */
+.hc0{background:#F8FAFC;}
+.hc1{background:#FEF3C7;color:#92400E;}
+.hc2{background:#FDE68A;color:#92400E;}
+.hc3{background:#FCD34D;color:#78350F;font-weight:600;}
+.hc4{background:#F59E0B;color:#fff;font-weight:700;}
+.hc5{background:#B45309;color:#fff;font-weight:700;}
+
+.verify-tag{display:inline-flex;align-items:center;gap:4px;padding:2px 7px;border-radius:4px;font-size:10px;font-weight:700;}
+.vt-ok{background:#DCFCE7;color:#166534;}
+.vt-warn{background:#FEF3C7;color:#92400E;}
+.vt-err{background:#FEE2E2;color:#991B1B;}
+
+.oq-box{background:linear-gradient(135deg,#EFF6FF,#F0FDF4);border:1px solid #BFDBFE;border-radius:10px;padding:20px 24px;}
+.oq-title{font-size:14px;font-weight:700;color:#1E40AF;margin-bottom:14px;}
+.oq-item{display:flex;gap:10px;margin-bottom:10px;align-items:flex-start;}
+.oq-num{width:22px;height:22px;background:#1D4ED8;color:#fff;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;flex-shrink:0;margin-top:1px;}
+.oq-text{font-size:12.5px;color:#374151;line-height:1.7;}
+.oq-text strong{color:#1D4ED8;}
+
+.footer{text-align:center;padding:16px;color:var(--ink4);font-size:11px;font-family:var(--mono);border-top:1px solid var(--rule);margin-top:8px;}
+</style>
+</head>
+<body>
+
+<div class="top-header">
+  <div class="th-eyebrow">Dataset Exploration Report · Stage 1 · Internal Use</div>
+  <div class="th-title">长文本回流数据集分析看板</div>
+  <div class="th-meta">
+    <span class="th-chip th-chip-lc"><span class="dot dot-lc"></span>LiChat 理想同学</span>
+    <span class="th-chip th-chip-cc"><span class="dot dot-cc"></span>ClaudeCode 代码场景</span>
+    <span class="th-chip th-chip-gray">目标：qwen3-30b-continue 训练数据筛选</span>
+    <span class="th-chip th-chip-gray">Benchmark：LongBench-v2 · RULER</span>
+    <span class="th-chip th-chip-gray">2026-03-31 · v3</span>
+  </div>
+</div>
+
+<div class="body">
+
+<!-- ═══ 采样说明 ═══ -->
+<div class="sec-head"><div class="sec-label">采样方式说明</div><div class="sec-rule"></div></div>
+<div class="sampling-grid full">
+  <div class="samp-card">
+    <div class="samp-title lc">LiChat 采样策略</div>
+    <div class="samp-row"><span class="samp-key">轻量列</span><span>全部 67 个文件 × 每文件随机 200 行 = <b>13,352 行</b>（turn_count · tokens · model · has_*）</span></div>
+    <div class="samp-row"><span class="samp-key">messages列</span><span>从前几个文件凑够 <b>3,000 行</b>即停（用于任务分类/语言检测）</span></div>
+    <div class="samp-row"><span class="samp-key">交叉分析</span><span>67 个文件 × 每文件 80 行 = <b>5,360 行</b>（同时读 messages + input_tokens）</span></div>
+    <div class="samp-note">三次采样随机种子一致（seed=42），文件集合相同</div>
+  </div>
+  <div class="samp-card">
+    <div class="samp-title cc">ClaudeCode 采样策略</div>
+    <div class="samp-row"><span class="samp-key">轻量列</span><span>509 个文件随机抽 <b>30 个</b> × 每文件 300 行 = <b>9,000 行</b></span></div>
+    <div class="samp-row"><span class="samp-key">messages列</span><span>从上述 30 个文件凑够 <b>3,000 行</b>即停</span></div>
+    <div class="samp-row"><span class="samp-key">交叉分析</span><span>509 个文件随机抽 <b>20 个</b> × 每文件 80 行 = <b>1,600 行</b>（同时读 messages + output_tokens）</span></div>
+    <div class="samp-note">ClaudeCode input_tokens 全量为0不可用，token量改用 messages 字符数 ÷ 3.5 估算</div>
+  </div>
+</div>
+
+<!-- ═══ DATA CASES ═══ -->
+<div class="sec-head"><div class="sec-label">原始数据示例（各1条完整记录）</div><div class="sec-rule"></div></div>
+<div class="case-grid full">
+  <div class="case-card">
+    <div class="case-header lc">● LiChat — 完整记录示例</div>
+    <div class="case-body"><pre>
+<span class="cm"># ── Hoodie 元数据（分区/文件管理，训练时不使用）</span>
+<span class="cf">_hoodie_commit_time</span>    <span class="cs">"20260319111010469"</span>
+<span class="cf">_hoodie_record_key</span>     <span class="cs">"0988a0918a54ba72fc413099d52f9f8f"</span>
+<span class="cf">_hoodie_partition_path</span> <span class="cs">"2026-03-18"</span>
+
+<span class="cm"># ── 请求元数据</span>
+<span class="cf">session_id</span>      <span class="cs">"0988a0918a54ba72fc413099d52f9f8f"</span>
+<span class="cf">caller_service</span>  <span class="cs">"openchat"</span>
+<span class="cf">model</span>           <span class="cs">"gpt-4o-2024-11-20"</span>       <span class="cm">← 统计模型分布</span>
+<span class="cf">request_time</span>    <span class="cs">"2026-03-18 09:46:37"</span>
+<span class="cf">latency_ms</span>      <span class="cn">24.0</span>
+
+<span class="cm"># ── 核心统计字段</span>
+<span class="cf">turn_count</span>      <span class="cn">2</span>           <span class="cm">← 对话轮次统计</span>
+<span class="cf">has_image</span>       <span class="cbf">False</span>       <span class="cm">← 是否含图片</span>
+<span class="cf">has_reasoning</span>   <span class="cbf">False</span>       <span class="cm">← 是否有CoT（对应reasoning字段非空）</span>
+<span class="cf">input_tokens</span>    <span class="cn">1335.0</span>      <span class="cm">← Token分布统计（可信）</span>
+<span class="cf">output_tokens</span>   <span class="cn">1352.0</span>      <span class="cm">← 极短回复过滤依据</span>
+<span class="cf">reasoning</span>       <span class="cbf">None</span>        <span class="cm">← has_reasoning=False时为None</span>
+
+<span class="cm"># ── messages：训练数据本体</span>
+<span class="cf">messages</span> [
+  {<span class="cx">"role"</span>:<span class="cs">"system"</span>, <span class="cx">"content"</span>:[{<span class="cx">"type"</span>:<span class="cs">"text"</span>,
+    <span class="cx">"text"</span>:<span class="cs">"现在是：2026年03月18日...\n请根据以下步骤分析</span>
+<span class="cs">           用户问题，判断是否需要联网搜索：\n...用0或1回答..."</span>
+  }]},                            <span class="cm">← search_routing类任务特征</span>
+  {<span class="cx">"role"</span>:<span class="cs">"user"</span>,     <span class="cx">"content"</span>:[{<span class="cx">"text"</span>:<span class="cs">"特斯拉今日股价？"</span>}]},
+  {<span class="cx">"role"</span>:<span class="cs">"assistant"</span>,<span class="cx">"content"</span>:[{<span class="cx">"text"</span>:<span class="cs">"1"</span>}]}
+]                                 <span class="cm">← output只有"1"，对应output_tokens极短</span>
+</pre></div>
+  </div>
+  <div class="case-card">
+    <div class="case-header cc">● ClaudeCode — 完整记录示例</div>
+    <div class="case-body"><pre>
+<span class="cm"># ── Hoodie 元数据</span>
+<span class="cf">_hoodie_commit_time</span>    <span class="cs">"20260326165730553"</span>
+<span class="cf">_hoodie_record_key</span>     <span class="cs">"02e61331-5279-47a1-ae4c-270fdc1c1165"</span>
+<span class="cf">_hoodie_partition_path</span> <span class="cs">"2026-03-25"</span>
+
+<span class="cm"># ── 请求元数据</span>
+<span class="cf">session_id</span>      <span class="cs">"iCpwKzeJS_q_uYiuzbsckg"</span>
+<span class="cf">username</span>        <span class="cs">"wangyunhao1"</span>     <span class="cm">← 使用前需脱敏</span>
+<span class="cf">llm_type</span>        <span class="cs">"NATIVE_CLAUDE"</span>
+<span class="cf">model</span>           <span class="cs">"claude-haiku-4-5-20251001"</span>
+<span class="cf">latency_ms</span>      <span class="cn">8.0</span>
+
+<span class="cm"># ── 核心统计字段</span>
+<span class="cf">turn_count</span>      <span class="cn">8</span>           <span class="cm">← 含工具调用来回</span>
+<span class="cf">has_tool</span>        <span class="cb">True</span>        <span class="cm">← 是否使用工具</span>
+<span class="cf">has_reasoning</span>   <span class="cbf">False</span>
+<span class="cf">tools_count</span>     <span class="cn">11</span>          <span class="cm">← 挂载工具数（≥5为复杂Agent任务）</span>
+<span class="cf">input_tokens</span>    <span class="cw">0</span>           <span class="cm">← ⚠ 全量异常，不可用！</span>
+<span class="cf">output_tokens</span>   <span class="cn">194</span>         <span class="cm">← 可用</span>
+<span class="cf">reasoning</span>       <span class="cs">""</span>          <span class="cm">← 空字符串而非None</span>
+
+<span class="cm"># ── tools_json：挂载工具定义（11个）</span>
+<span class="cf">tools_json</span> [
+  {<span class="cx">"name"</span>:<span class="cs">"Bash"</span>,<span class="cx">"description"</span>:<span class="cs">"Executes a bash command..."</span>},
+  {<span class="cx">"name"</span>:<span class="cs">"Read"</span>,<span class="cx">"description"</span>:<span class="cs">"Reads a file..."</span>},
+  <span class="cm">... 共11个工具</span>
+]
+
+<span class="cm"># ── messages：实际达75,874字符 ≈ 21.7K tokens</span>
+<span class="cf">messages</span> [
+  {<span class="cx">"role"</span>:<span class="cs">"system"</span>,<span class="cx">"content"</span>:[
+    {<span class="cx">"text"</span>:<span class="cs">"You are Claude Code..."</span>},
+    {<span class="cx">"text"</span>:<span class="cs">"You are a file search specialist...READ-ONLY..."</span>}
+  ]},
+  {<span class="cx">"role"</span>:<span class="cs">"user"</span>,    <span class="cx">"content"</span>:[{<span class="cx">"text"</span>:<span class="cs">"找一下项目里所有的config文件"</span>}]},
+  {<span class="cx">"role"</span>:<span class="cs">"assistant"</span>,<span class="cx">"content"</span>:[{<span class="cx">"type"</span>:<span class="cs">"tool_use"</span>,
+    <span class="cx">"name"</span>:<span class="cs">"Bash"</span>,<span class="cx">"input"</span>:{<span class="cx">"command"</span>:<span class="cs">"find . -name '*.config*'"</span>}}]},
+  {<span class="cx">"role"</span>:<span class="cs">"user"</span>,    <span class="cx">"content"</span>:[{<span class="cx">"type"</span>:<span class="cs">"tool_result"</span>,
+    <span class="cx">"content"</span>:<span class="cs">"./src/config.js\n./webpack.config.js\n..."</span>}]},
+  <span class="cm">... 共8轮</span>
+]
+</pre></div>
+  </div>
+</div>
+
+<!-- ═══ KPIs ═══ -->
+<div class="sec-head"><div class="sec-label">数据规模总览</div><div class="sec-rule"></div></div>
+<div class="g4">
+  <div class="card kpi-lc"><div class="cb-">
+    <div class="kpi-label">LiChat 总条数</div>
+    <div class="kpi-val" style="color:var(--lc)">67,691</div>
+    <div class="kpi-sub">67 个 parquet · ~12.2 GB · 14 天</div>
+  </div></div>
+  <div class="card kpi-cc"><div class="cb-">
+    <div class="kpi-label">ClaudeCode 总条数</div>
+    <div class="kpi-val" style="color:var(--cc-dim)">1,401,554</div>
+    <div class="kpi-sub">509 个 parquet · ~88.8 GB · 7 天</div>
+  </div></div>
+  <div class="card kpi-sl"><div class="cb-">
+    <div class="kpi-label">LiChat 交叉分析样本</div>
+    <div class="kpi-val" style="color:#334155">5,360</div>
+    <div class="kpi-sub">67 文件 × 80 行，同时读 messages + tokens</div>
+  </div></div>
+  <div class="card kpi-te"><div class="cb-">
+    <div class="kpi-label">ClaudeCode 交叉分析样本</div>
+    <div class="kpi-val" style="color:#0E7490">1,600</div>
+    <div class="kpi-sub">20 随机文件 × 80 行，token 为字符数估算</div>
+  </div></div>
+</div>
+
+<!-- ═══ LICHAT ═══ -->
+<div class="dataset-rule">
+  <span class="pill pill-lc">LiChat 理想同学</span>
+  <div class="lr lr-lc"></div>
+</div>
+
+<!-- Turn + Input Token -->
+<div class="g2">
+  <div class="card"><div class="cb-">
+    <div class="ctitle"><span class="ctag ctag-lc">13,352行</span>对话轮次分布 — turn_count 字段</div>
+    <div class="pb-row"><span class="pb-label">1 轮</span><div class="pb-bg"><div class="pb-fill" style="width:100%;background:var(--lc)">36.6%</div></div><span class="pb-pct">36.6%</span><span class="pb-count">4,882</span></div>
+    <div class="pb-row"><span class="pb-label">2 轮</span><div class="pb-bg"><div class="pb-fill" style="width:50%;background:var(--lc)">18.3%</div></div><span class="pb-pct">18.3%</span><span class="pb-count">2,448</span></div>
+    <div class="pb-row"><span class="pb-label">3~4 轮</span><div class="pb-bg"><div class="pb-fill" style="width:52.7%;background:var(--lc)">19.3%</div></div><span class="pb-pct">19.3%</span><span class="pb-count">2,572</span></div>
+    <div class="pb-row"><span class="pb-label">5~10 轮</span><div class="pb-bg"><div class="pb-fill" style="width:45.6%;background:var(--lc-dim)">16.7%</div></div><span class="pb-pct">16.7%</span><span class="pb-count">2,231</span></div>
+    <div class="pb-row"><span class="pb-label">11~20 轮</span><div class="pb-bg"><div class="pb-fill" style="width:15.6%;background:#93C5FD">5.7%</div></div><span class="pb-pct">5.7%</span><span class="pb-count">762</span></div>
+    <div class="pb-row"><span class="pb-label">21+ 轮</span><div class="pb-bg"><div class="pb-fill" style="width:9.3%;background:#BFDBFE">3.4%</div></div><span class="pb-pct">3.4%</span><span class="pb-count">457</span></div>
+    <div class="stat-row">
+      <span class="stat-pill">均值 <b>5.1</b></span><span class="stat-pill">中位数 <b>2</b></span><span class="stat-pill">P90 <b>10</b></span><span class="stat-pill">最大 <b>409</b></span>
+    </div>
+    <div class="fn">均值(5.1) 远大于中位数(2)，长尾分布；最大409轮可能为异常会话</div>
+  </div></div>
+
+  <div class="card"><div class="cb-">
+    <div class="ctitle"><span class="ctag ctag-lc">13,096有效行</span>Input Token 分布 — input_tokens 字段（去除空值/零值后）</div>
+    <div class="pb-row"><span class="pb-label">≥ 512</span><div class="pb-bg"><div class="pb-fill" style="width:100%;background:var(--lc)">68.2%</div></div><span class="pb-pct">68.2%</span><span class="pb-count">8,933</span></div>
+    <div class="pb-row"><span class="pb-label">≥ 1K</span><div class="pb-bg"><div class="pb-fill" style="width:88.9%;background:var(--lc)">60.6%</div></div><span class="pb-pct">60.6%</span><span class="pb-count">7,938</span></div>
+    <div class="pb-row"><span class="pb-label">≥ 2K</span><div class="pb-bg"><div class="pb-fill" style="width:74.3%;background:var(--lc)">50.7%</div></div><span class="pb-pct">50.7%</span><span class="pb-count">6,638</span></div>
+    <div class="pb-row"><span class="pb-label">≥ 4K</span><div class="pb-bg"><div class="pb-fill" style="width:56.9%;background:var(--lc-dim)">38.8%</div></div><span class="pb-pct">38.8%</span><span class="pb-count">5,080</span></div>
+    <div class="pb-row"><span class="pb-label">≥ 8K</span><div class="pb-bg"><div class="pb-fill" style="width:30.4%;background:#93C5FD">20.7%</div></div><span class="pb-pct">20.7%</span><span class="pb-count">2,707</span></div>
+    <div class="pb-row"><span class="pb-label">≥ 16K</span><div class="pb-bg"><div class="pb-fill" style="width:14.4%;background:#BFDBFE">9.8%</div></div><span class="pb-pct">9.8%</span><span class="pb-count">1,285</span></div>
+    <div class="pb-row"><span class="pb-label">≥ 32K</span><div class="pb-bg"><div class="pb-fill" style="width:7.9%;background:#DBEAFE">5.4%</div></div><span class="pb-pct">5.4%</span><span class="pb-count">708</span></div>
+    <div class="stat-row">
+      <span class="stat-pill">中位数 <b>2,133</b></span><span class="stat-pill">均值 <b>9,039</b></span><span class="stat-pill">P75 <b>7,314</b></span><span class="stat-pill">P95 <b>35,161</b></span>
+    </div>
+    <div class="fn">均值(9K) vs 中位数(2K)，同样长尾；空值/0值占1.6%已剔除</div>
+  </div></div>
+</div>
+
+<!-- Output + lang + quality -->
+<div class="g3">
+  <div class="card"><div class="cb-">
+    <div class="ctitle"><span class="ctag ctag-lc">13,352行</span>Output Token — output_tokens 字段</div>
+    <div class="alert alert-warn"><span class="alert-icon">⚠</span><span>极短输出(&lt;50) <b>16.4%</b>（2,154条），主要来自 search_routing 任务（assistant只输出"0"或"1"）</span></div>
+    <div class="stat-row"><span class="stat-pill">中位数 <b>927</b></span><span class="stat-pill">均值 <b>1,383</b></span><span class="stat-pill">P95 <b>4,057</b></span><span class="stat-pill">最大 <b>64,000</b></span></div>
+  </div></div>
+  <div class="card"><div class="cb-">
+    <div class="ctitle"><span class="ctag ctag-lc">3,000行</span>语言分布 — 首条 user 消息字符比例</div>
+    <div class="ch ch220"><canvas id="lcLang"></canvas></div>
+    <div class="fn">正则统计中/英字符比例，>30%判中文，&lt;5%判英文</div>
+  </div></div>
+  <div class="card"><div class="cb-">
+    <div class="ctitle"><span class="ctag ctag-lc">13,352行</span>数据质量</div>
+    <ul class="q-list">
+      <li class="q-item"><span class="q-left"><code>input/output_tokens</code> 空值</span><div class="q-right"><span class="q-num" style="color:var(--ok)">1.6%</span><span class="ctag ctag-ok">✓</span></div></li>
+      <li class="q-item"><span class="q-left"><code>turn_count / model</code> 空值</span><div class="q-right"><span class="q-num" style="color:var(--ok)">0.0%</span><span class="ctag ctag-ok">✓</span></div></li>
+      <li class="q-item"><span class="q-left"><code>has_image</code> = True</span><div class="q-right"><span class="q-num">6.0%</span><span class="ctag ctag-gray">795条</span></div></li>
+      <li class="q-item"><span class="q-left"><code>has_reasoning</code> = True（含CoT）</span><div class="q-right"><span class="q-num" style="color:var(--lc)">33.5%</span><span class="ctag ctag-lc">高价值</span></div></li>
+    </ul>
+    <div style="margin-top:12px">
+      <div style="font-size:11px;font-weight:700;color:var(--ink3);letter-spacing:.05em;text-transform:uppercase;margin-bottom:8px;">模型分布 Top 5</div>
+      <div class="pb-row"><span class="pb-label pb-label-wide">gpt-4o-2024-11-20</span><div class="pb-bg"><div class="pb-fill" style="width:100%;background:var(--lc)">40.5%</div></div><span class="pb-pct">40.5%</span></div>
+      <div class="pb-row"><span class="pb-label pb-label-wide">gpt-5.4-...-ev3</span><div class="pb-bg"><div class="pb-fill" style="width:43%;background:var(--lc-dim)">17.4%</div></div><span class="pb-pct">17.4%</span></div>
+      <div class="pb-row"><span class="pb-label pb-label-wide">claude-opus-4-6</span><div class="pb-bg"><div class="pb-fill" style="width:28.1%;background:#7C3AED">11.4%</div></div><span class="pb-pct">11.4%</span></div>
+      <div class="pb-row"><span class="pb-label pb-label-wide">gemini-3.1-pro</span><div class="pb-bg"><div class="pb-fill" style="width:23.2%;background:#059669">9.4%</div></div><span class="pb-pct">9.4%</span></div>
+      <div class="pb-row"><span class="pb-label pb-label-wide">claude-sonnet-4-6</span><div class="pb-bg"><div class="pb-fill" style="width:16.3%;background:#0891B2">6.6%</div></div><span class="pb-pct">6.6%</span></div>
+    </div>
+    <div class="fn">模型来源杂（GPT/Claude/Gemini混合），筛选时需考虑是否按 teacher model 过滤</div>
+  </div></div>
+</div>
+
+<!-- ═══ LICHAT CROSS ANALYSIS ═══ -->
+<div class="sec-head"><div class="sec-label">LiChat · 任务类型 × Input Token 交叉分析</div><div class="sec-rule"></div></div>
+
+<div class="alert alert-warn full" style="margin-bottom:14px">
+  <span class="alert-icon">⚠</span>
+  <span>任务类型分类基于关键词规则，已通过随机抽样验证。<b>search_routing / code / reasoning / creative 分类可信</b>；<b>qa 中混入了大量技术操作问题</b>（因为用户没用"代码"等词，只有问号，实际应归入 code）；<b>summarize 有少量误分类</b>（技术问题被误命中）；other 是合理兜底但内容杂。</span>
+</div>
+
+<div class="full card"><div class="cb-">
+  <div class="ctitle"><span class="ctag ctag-lc">5,360行</span>各任务类型的 Input Token 分布 · 颜色越深 = 占比越高</div>
+  <div style="overflow-x:auto">
+  <table class="cross-table">
+    <thead>
+      <tr>
+        <th class="task-col">任务类型</th>
+        <th>&lt;512</th><th>512~2K</th><th>2K~4K</th><th>4K~8K</th><th>8K~16K</th><th>16K+</th>
+        <th>中位数 tok</th><th>均值 tok</th><th>样本数</th><th>验证</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td class="task-name">search_routing</td>
+        <td class="h2">24.9%</td><td class="h1">17.6%</td><td class="h1">13.8%</td><td class="h3">29.4%</td><td class="h1">13.3%</td><td class="h0">1.0%</td>
+        <td class="stat">3,094</td><td class="stat">4,226</td><td class="n">2,091</td>
+        <td><span class="verify-tag vt-ok">✓ 准确</span></td>
+      </tr>
+      <tr>
+        <td class="task-name">other</td>
+        <td class="h3">47.6%</td><td class="h1">17.1%</td><td class="h1">10.0%</td><td class="h0">7.8%</td><td class="h0">7.1%</td><td class="h1">10.3%</td>
+        <td class="stat">643</td><td class="stat">7,432</td><td class="n">1,085</td>
+        <td><span class="verify-tag vt-ok">✓ 合理</span></td>
+      </tr>
+      <tr>
+        <td class="task-name">qa</td>
+        <td class="h3">40.8%</td><td class="h1">18.0%</td><td class="h1">10.4%</td><td class="h1">11.8%</td><td class="h1">8.3%</td><td class="h1">10.8%</td>
+        <td class="stat">1,157</td><td class="stat">8,257</td><td class="n">1,077</td>
+        <td><span class="verify-tag vt-warn">⚠ 混入code</span></td>
+      </tr>
+      <tr>
+        <td class="task-name">code</td>
+        <td class="h1">20.3%</td><td class="h1">16.3%</td><td class="h1">12.5%</td><td class="h1">12.2%</td><td class="h1">12.6%</td><td class="h4">26.1%</td>
+        <td class="stat">4,241</td><td class="stat">19,252</td><td class="n">625</td>
+        <td><span class="verify-tag vt-ok">✓ 准确</span></td>
+      </tr>
+      <tr>
+        <td class="task-name">summarize</td>
+        <td class="h0">7.0%</td><td class="h1">16.2%</td><td class="h0">8.1%</td><td class="h0">9.2%</td><td class="h1">11.4%</td><td class="h5">48.1%</td>
+        <td class="stat">14,072</td><td class="stat">36,779</td><td class="n">185</td>
+        <td><span class="verify-tag vt-warn">⚠ 少量误分</span></td>
+      </tr>
+      <tr>
+        <td class="task-name">reasoning</td>
+        <td class="h1">19.2%</td><td class="h1">20.4%</td><td class="h1">11.4%</td><td class="h1">11.4%</td><td class="h2">15.0%</td><td class="h2">22.8%</td>
+        <td class="stat">3,910</td><td class="stat">17,571</td><td class="n">167</td>
+        <td><span class="verify-tag vt-ok">✓ 准确</span></td>
+      </tr>
+      <tr>
+        <td class="task-name">creative</td>
+        <td class="h2">33.3%</td><td class="h2">28.6%</td><td class="h0">9.5%</td><td class="h0">4.8%</td><td class="h1">14.3%</td><td class="h0">9.5%</td>
+        <td class="stat">1,451</td><td class="stat">7,799</td><td class="n">21</td>
+        <td><span class="verify-tag vt-ok">✓ 准确</span></td>
+      </tr>
+    </tbody>
+  </table>
+  </div>
+
+  <div style="margin-top:18px">
+    <div class="ctitle" style="margin-bottom:10px">各任务 Output Token 分布</div>
+    <div style="overflow-x:auto">
+    <table class="cross-table">
+      <thead>
+        <tr>
+          <th class="task-col">任务类型</th>
+          <th>output 中位数</th><th>output 均值</th><th>极短输出(&lt;50)占比</th><th>说明</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr><td class="task-name">search_routing</td><td>737</td><td>780</td><td class="h3" style="color:#1D4ED8">24.1%</td><td style="text-align:left;font-size:11px;color:var(--ink3)">assistant 仅输 "0"/"1"，极短比例最高，建议整体过滤</td></tr>
+        <tr><td class="task-name">other</td><td>893</td><td>1,411</td><td class="h1">12.2%</td><td style="text-align:left;font-size:11px;color:var(--ink3)">内容杂，翻译/介绍类均有</td></tr>
+        <tr><td class="task-name">qa</td><td>1,246</td><td>1,572</td><td class="h0">8.1%</td><td style="text-align:left;font-size:11px;color:var(--ink3)">混有技术问答，output 质量较好</td></tr>
+        <tr><td class="task-name">code</td><td>1,298</td><td>2,500</td><td class="h0">9.6%</td><td style="text-align:left;font-size:11px;color:var(--ink3)">output 质量好，16K+ input 占 26%，长文本场景强</td></tr>
+        <tr><td class="task-name">summarize</td><td>1,166</td><td>2,499</td><td class="h1">15.1%</td><td style="text-align:left;font-size:11px;color:var(--ink3)">input 最长（中位 14K），典型长上下文任务</td></tr>
+        <tr><td class="task-name">reasoning</td><td>1,792</td><td>2,486</td><td class="h0">7.2%</td><td style="text-align:left;font-size:11px;color:var(--ink3)">output 最长，极短比例最低，质量最优</td></tr>
+        <tr><td class="task-name">creative</td><td>1,483</td><td>2,564</td><td class="h0">9.5%</td><td style="text-align:left;font-size:11px;color:var(--ink3)">样本量少（21条），参考价值有限</td></tr>
+      </tbody>
+    </table>
+    </div>
+  </div>
+  <div class="fn">交叉分析基于 5,360 行（67文件×80行），同时读 messages + input_tokens 两列；任务类型分类规则见验证说明</div>
+</div></div>
+
+<!-- ═══ CLAUDECODE ═══ -->
+<div class="dataset-rule">
+  <span class="pill pill-cc">ClaudeCode 代码场景</span>
+  <div class="lr lr-cc"></div>
+</div>
+
+<!-- Turn + Token -->
+<div class="g2">
+  <div class="card"><div class="cb-">
+    <div class="ctitle"><span class="ctag ctag-cc">9,000行</span>对话轮次分布 — turn_count 字段</div>
+    <div class="pb-row"><span class="pb-label">1 轮</span><div class="pb-bg"><div class="pb-fill" style="width:29.9%;background:#D97706">16.5%</div></div><span class="pb-pct">16.5%</span><span class="pb-count">1,489</span></div>
+    <div class="pb-row"><span class="pb-label">2 轮</span><div class="pb-bg"><div class="pb-fill" style="width:8.7%;background:#F59E0B">4.8%</div></div><span class="pb-pct">4.8%</span><span class="pb-count">434</span></div>
+    <div class="pb-row"><span class="pb-label">3~4 轮</span><div class="pb-bg"><div class="pb-fill" style="width:5.8%;background:#FCD34D">3.2%</div></div><span class="pb-pct">3.2%</span><span class="pb-count">286</span></div>
+    <div class="pb-row"><span class="pb-label">5~10 轮</span><div class="pb-bg"><div class="pb-fill" style="width:19.4%;background:var(--cc-dim)">10.7%</div></div><span class="pb-pct">10.7%</span><span class="pb-count">960</span></div>
+    <div class="pb-row"><span class="pb-label">11~20 轮</span><div class="pb-bg"><div class="pb-fill" style="width:17.4%;background:var(--cc-dim)">9.6%</div></div><span class="pb-pct">9.6%</span><span class="pb-count">862</span></div>
+    <div class="pb-row"><span class="pb-label">21+ 轮</span><div class="pb-bg"><div class="pb-fill" style="width:100%;background:var(--cc)">55.2%</div></div><span class="pb-pct">55.2%</span><span class="pb-count">4,969</span></div>
+    <div class="stat-row">
+      <span class="stat-pill">均值 <b>41.6</b></span><span class="stat-pill">中位数 <b>24</b></span><span class="stat-pill">P90 <b>87</b></span><span class="stat-pill">最大 <b>715</b></span>
+    </div>
+    <div class="fn">典型 Agent 数据：55.2% 超过21轮，中位数24轮，与LiChat(中位数2轮)截然不同</div>
+  </div></div>
+
+  <div class="card"><div class="cb-">
+    <div class="ctitle"><span class="ctag ctag-err">字段异常</span>Input Token — input_tokens 全量=0，改用 messages 字符数估算</div>
+    <div class="alert alert-err"><span class="alert-icon">🚨</span><span><code style="font-family:var(--mono)">input_tokens</code> 全量为 0，不可用。以下为 messages.str.len() ÷ 3.5 粗估（±20%误差）</span></div>
+    <div class="pb-row"><span class="pb-label">~≥ 512 tok</span><div class="pb-bg"><div class="pb-fill" style="width:100%;background:var(--cc)">86.5%</div></div><span class="pb-pct">86.5%</span></div>
+    <div class="pb-row"><span class="pb-label">~≥ 1K tok</span><div class="pb-bg"><div class="pb-fill" style="width:85.3%;background:var(--cc)">73.8%</div></div><span class="pb-pct">73.8%</span></div>
+    <div class="pb-row"><span class="pb-label">~≥ 2K tok</span><div class="pb-bg"><div class="pb-fill" style="width:79.1%;background:var(--cc-dim)">68.4%</div></div><span class="pb-pct">68.4%</span></div>
+    <div class="pb-row"><span class="pb-label">~≥ 4K tok</span><div class="pb-bg"><div class="pb-fill" style="width:76.2%;background:var(--cc-dim)">65.9%</div></div><span class="pb-pct">65.9%</span></div>
+    <div class="pb-row"><span class="pb-label">~≥ 8K tok</span><div class="pb-bg"><div class="pb-fill" style="width:70.1%;background:#F59E0B">60.6%</div></div><span class="pb-pct">60.6%</span></div>
+    <div class="pb-row"><span class="pb-label">~≥ 16K tok</span><div class="pb-bg"><div class="pb-fill" style="width:61.3%;background:#FCD34D">53.0%</div></div><span class="pb-pct">53.0%</span></div>
+    <div class="stat-row">
+      <span class="stat-pill">字符中位数 <b>68,351</b> (~19.5K tok)</span>
+      <span class="stat-pill">P75 <b>176,818</b> (~50.5K tok)</span>
+      <span class="stat-pill">P95 <b>333,283</b> (~95K tok)</span>
+    </div>
+    <div class="fn">基于 3,000 行 messages 样本；天然长文本，中位数约20K tokens</div>
+  </div></div>
+</div>
+
+<!-- Output + lang + quality -->
+<div class="g3">
+  <div class="card"><div class="cb-">
+    <div class="ctitle"><span class="ctag ctag-cc">9,000行</span>Output Token + 工具调用</div>
+    <div class="alert alert-warn"><span class="alert-icon">⚠</span><span>极短输出(&lt;50) <b>18.1%</b>，与 has_tool=False 高度重叠</span></div>
+    <div class="stat-row"><span class="stat-pill">中位数 <b>210</b></span><span class="stat-pill">均值 <b>689</b></span><span class="stat-pill">P95 <b>3,175</b></span></div>
+    <div style="margin-top:14px">
+      <div style="font-size:11px;font-weight:700;color:var(--ink3);letter-spacing:.05em;text-transform:uppercase;margin-bottom:8px;">tools_count 分布</div>
+      <div class="pb-row"><span class="pb-label">= 0（无工具）</span><div class="pb-bg"><div class="pb-fill" style="width:28.6%;background:#94A3B8">22.3%</div></div><span class="pb-pct">22.3%</span></div>
+      <div class="pb-row"><span class="pb-label">≥ 1</span><div class="pb-bg"><div class="pb-fill" style="width:100%;background:var(--cc-dim)">77.7%</div></div><span class="pb-pct">77.7%</span></div>
+      <div class="pb-row"><span class="pb-label">≥ 5</span><div class="pb-bg"><div class="pb-fill" style="width:95.4%;background:var(--cc-dim)">74.1%</div></div><span class="pb-pct">74.1%</span></div>
+      <div class="pb-row"><span class="pb-label">≥ 10</span><div class="pb-bg"><div class="pb-fill" style="width:89.2%;background:var(--cc)">69.3%</div></div><span class="pb-pct">69.3%</span></div>
+      <div class="stat-row"><span class="stat-pill">均值 <b>16.8</b></span><span class="stat-pill">中位数 <b>15</b></span><span class="stat-pill">最大 <b>170</b></span></div>
+    </div>
+  </div></div>
+  <div class="card"><div class="cb-">
+    <div class="ctitle"><span class="ctag ctag-cc">3,000行</span>语言分布 — 首条 user 消息</div>
+    <div class="ch ch220"><canvas id="ccLang"></canvas></div>
+    <div class="fn">ClaudeCode以英文为主(77%)，与LiChat(中文69%)形成对比</div>
+  </div></div>
+  <div class="card"><div class="cb-">
+    <div class="ctitle"><span class="ctag ctag-cc">9,000行</span>数据质量 + 模型分布</div>
+    <ul class="q-list">
+      <li class="q-item"><span class="q-left">所有关键字段空值率</span><div class="q-right"><span class="q-num" style="color:var(--ok)">0.0%</span><span class="ctag ctag-ok">✓</span></div></li>
+      <li class="q-item"><span class="q-left"><code>input_tokens</code> 可用性</span><div class="q-right"><span class="q-num" style="color:var(--err)">全量=0</span><span class="ctag ctag-err">不可用</span></div></li>
+      <li class="q-item"><span class="q-left"><code>has_reasoning</code>=True</span><div class="q-right"><span class="q-num">37.1%</span><span class="ctag ctag-gray">3,339条</span></div></li>
+      <li class="q-item"><span class="q-left"><code>has_tool</code>=True</span><div class="q-right"><span class="q-num" style="color:var(--cc)">58.3%</span><span class="ctag ctag-cc">5,243条</span></div></li>
+    </ul>
+    <div style="margin-top:12px">
+      <div style="font-size:11px;font-weight:700;color:var(--ink3);letter-spacing:.05em;text-transform:uppercase;margin-bottom:8px;">模型分布 Top 5</div>
+      <div class="pb-row"><span class="pb-label pb-label-wide">claude-sonnet-4-6</span><div class="pb-bg"><div class="pb-fill" style="width:100%;background:var(--cc)">39.3%</div></div><span class="pb-pct">39.3%</span></div>
+      <div class="pb-row"><span class="pb-label pb-label-wide">claude-haiku-4-5</span><div class="pb-bg"><div class="pb-fill" style="width:61.8%;background:var(--cc-dim)">24.3%</div></div><span class="pb-pct">24.3%</span></div>
+      <div class="pb-row"><span class="pb-label pb-label-wide">claude-sonnet-4-5</span><div class="pb-bg"><div class="pb-fill" style="width:54.7%;background:#F59E0B">21.5%</div></div><span class="pb-pct">21.5%</span></div>
+      <div class="pb-row"><span class="pb-label pb-label-wide">claude-opus-4-6</span><div class="pb-bg"><div class="pb-fill" style="width:33.1%;background:#FCD34D">13.0%</div></div><span class="pb-pct">13.0%</span></div>
+      <div class="pb-row"><span class="pb-label pb-label-wide">gemini-2.5-flash-lite</span><div class="pb-bg"><div class="pb-fill" style="width:1.8%;background:#94A3B8">0.7%</div></div><span class="pb-pct">0.7%</span></div>
+    </div>
+  </div></div>
+</div>
+
+<!-- ═══ CLAUDECODE CROSS ANALYSIS ═══ -->
+<div class="sec-head"><div class="sec-label">ClaudeCode · 任务类型 × Token 交叉分析</div><div class="sec-rule"></div></div>
+
+<div class="alert alert-err full" style="margin-bottom:14px">
+  <span class="alert-icon">🚨</span>
+  <span><b>ClaudeCode 任务分类基本失效，以下数字仅供参考，不可直接用于筛选决策。</b> 根本原因：ClaudeCode 的 system prompt 很长，前200字是通用 "You are Claude Code..." 描述，真正的任务角色定义在后面，关键词匹配只扫到了通用文本。验证发现：file_search / bash_cmd 命中的实际是普通 Agent 任务；analysis 命中的是对话状态元分类器（isNewTopic 判断）。若需要可信的任务分类，需要完整扫描 system prompt 全文，或直接按 tools_count / output_tokens 等字段做代理筛选。</span>
+</div>
+
+<div class="full card"><div class="cb-">
+  <div class="ctitle"><span class="ctag ctag-err">分类不可信</span>各"任务类型"的 Token 分布（token = messages字符数 ÷ 3.5 估算）</div>
+  <div style="overflow-x:auto">
+  <table class="cross-table">
+    <thead>
+      <tr>
+        <th class="task-col">分类标签</th>
+        <th>&lt;512</th><th>512~2K</th><th>2K~4K</th><th>4K~8K</th><th>8K~16K</th><th>16K+</th>
+        <th>中位数 tok</th><th>output 中位数</th><th>output&lt;50占比</th><th>验证</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td class="task-name">file_search</td>
+        <td class="hc0">0.0%</td><td class="hc0">0.7%</td><td class="hc0">1.6%</td><td class="hc1">5.0%</td><td class="hc1">7.8%</td><td class="hc5">84.8%</td>
+        <td class="stat">49,032</td><td>276</td><td class="hc1">1.2%</td>
+        <td><span class="verify-tag vt-err">✗ 实为通用Agent</span></td>
+      </tr>
+      <tr>
+        <td class="task-name">bash_cmd</td>
+        <td class="hc0">0.0%</td><td class="hc2">19.4%</td><td class="hc0">1.0%</td><td class="hc0">2.1%</td><td class="hc1">4.1%</td><td class="hc4">73.3%</td>
+        <td class="stat">51,516</td><td>145</td><td class="hc3">24.6%</td>
+        <td><span class="verify-tag vt-err">✗ 实为通用Agent</span></td>
+      </tr>
+      <tr>
+        <td class="task-name">other</td>
+        <td class="hc3">33.1%</td><td class="hc4">46.1%</td><td class="hc1">3.3%</td><td class="hc1">4.5%</td><td class="hc0">2.4%</td><td class="hc1">10.6%</td>
+        <td class="stat">660</td><td>32</td><td class="hc5">66.9%</td>
+        <td><span class="verify-tag vt-ok">✓ 实为元子任务</span></td>
+      </tr>
+      <tr>
+        <td class="task-name">code_gen</td>
+        <td class="hc2">26.5%</td><td class="hc0">2.0%</td><td class="hc0">0.0%</td><td class="hc0">1.4%</td><td class="hc1">4.1%</td><td class="hc4">66.0%</td>
+        <td class="stat">26,954</td><td>120</td><td class="hc3">29.9%</td>
+        <td><span class="verify-tag vt-warn">⚠ 大体对，有混入</span></td>
+      </tr>
+      <tr>
+        <td class="task-name">analysis</td>
+        <td class="hc5">81.2%</td><td class="hc1">12.5%</td><td class="hc0">6.2%</td><td class="hc0">0.0%</td><td class="hc0">0.0%</td><td class="hc0">0.0%</td>
+        <td class="stat">211</td><td>21.5</td><td class="hc5">93.8%</td>
+        <td><span class="verify-tag vt-err">✗ 实为对话状态分类器</span></td>
+      </tr>
+    </tbody>
+  </table>
+  </div>
+
+  <div style="margin-top:16px;padding:14px;background:#FFF7ED;border:1px solid #FED7AA;border-radius:8px;font-size:12px;color:#7C2D12;">
+    <b>ClaudeCode 可信的替代筛选维度：</b>不依赖任务分类，直接用以下字段筛选更可靠——<br>
+    · <b>长文本</b>：messages.str.len() ≥ 14,000（对应 ~4K tokens）→ 覆盖 65.9% 数据<br>
+    · <b>复杂Agent任务</b>：tools_count ≥ 10 → 覆盖 69.3%；has_tool=True → 覆盖 58.3%<br>
+    · <b>质量过滤</b>：output_tokens ≥ 50 → 过滤掉 18.1% 的极短子任务（bash_cmd判断/状态分类器等）<br>
+    · <b>高推理</b>：has_reasoning=True → 覆盖 37.1%
+  </div>
+  <div class="fn">交叉分析基于 1,600 行（20文件×80行），token 为估算值；任务分类问题见上方红色说明</div>
+</div></div>
+
+<!-- ═══ OPEN QUESTIONS ═══ -->
+<div class="sec-head"><div class="sec-label">待确认问题</div><div class="sec-rule"></div></div>
+<div class="oq-box full">
+  <div class="oq-title">📌 三个问题需要你来判断</div>
+  <div class="oq-item">
+    <div class="oq-num">1</div>
+    <div class="oq-text"><strong>LiChat 的 search_routing 占 37.8%</strong>——assistant 侧只输出"0"或"1"（output_tokens 极短，极短占比24.1%）。是整体丢弃，还是保留 user 侧问题另作他用？整体丢弃后 LiChat 有效数据量降至约 42,000 条。</div>
+  </div>
+  <div class="oq-item">
+    <div class="oq-num">2</div>
+    <div class="oq-text"><strong>LiChat 模型来源很杂</strong>（GPT-4o 40.5% / GPT-5 17.4% / Claude-Opus 11.4% / Gemini 9.4%），不同 teacher 质量和风格差异大。是否需要只保留特定模型输出？</div>
+  </div>
+  <div class="oq-item">
+    <div class="oq-num">3</div>
+    <div class="oq-text"><strong>ClaudeCode 的 input_tokens 全量为 0</strong>——是上报 bug 还是设计如此？决定后续筛长文本是用字符数粗估还是必须跑一遍 tokenizer 精确计算。</div>
+  </div>
+</div>
+
+<div class="footer">dataset_dashboard_v3.html · 所有统计均为真实采样数据 · 无估算值（token估算除外，已标注）· 2026-03-31</div>
+</div>
+
+<script>
+Chart.defaults.font.family="'Noto Sans SC','PingFang SC',sans-serif";
+Chart.defaults.font.size=11;
+Chart.defaults.color='#64748B';
+
+new Chart(document.getElementById('lcLang'),{type:'doughnut',data:{labels:['中文 (zh)','英文 (en)','中英混合 (mixed)','其他'],datasets:[{data:[69.1,15.4,15.3,0.2],backgroundColor:['#1D4ED8','#3B82F6','#93C5FD','#DBEAFE'],borderWidth:0,hoverOffset:5}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'right',labels:{padding:14,font:{size:11}}},tooltip:{callbacks:{label:ctx=>` ${ctx.label}: ${ctx.raw}%`}}},cutout:'62%'}});
+
+new Chart(document.getElementById('ccLang'),{type:'doughnut',data:{labels:['英文 (en)','中文 (zh)','中英混合 (mixed)'],datasets:[{data:[77.0,13.9,9.1],backgroundColor:['#B45309','#D97706','#FCD34D'],borderWidth:0,hoverOffset:5}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'right',labels:{padding:14,font:{size:11}}},tooltip:{callbacks:{label:ctx=>` ${ctx.label}: ${ctx.raw}%`}}},cutout:'62%'}});
+</script>
+</body>
+</html>
